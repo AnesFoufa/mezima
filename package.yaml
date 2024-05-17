@@ -1,14 +1,14 @@
-name:                mezima
-version:             0.1.0.0
-github:              githubuser/mezima
-license:             BSD-3-Clause
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2024 Author name here
+name: mezima
+version: 0.1.0.0
+github: githubuser/mezima
+license: BSD-3-Clause
+author: Author name here
+maintainer: example@example.com
+copyright: 2024 Author name here
 
 extra-source-files:
-- README.md
-- CHANGELOG.md
+  - README.md
+  - CHANGELOG.md
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -17,48 +17,56 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on Github at <https://github.com/githubuser/mezima#readme>
+description: Please see the README on Github at <https://github.com/githubuser/mezima#readme>
 
 dependencies:
-- base >= 4.11 && < 10
-- rio >= 0.1.12.0
+  - base >= 4.11 && < 10
+  - rio >= 0.1.12.0
+  - megaparsec
+  - scientific
+  - QuickCheck
+default-extensions:
+  - NoImplicitPrelude
+  - OverloadedRecordDot
+  - DuplicateRecordFields
+  - BlockArguments
 
 ghc-options:
-- -Wall
-- -Wcompat
-- -Widentities
-- -Wincomplete-record-updates
-- -Wincomplete-uni-patterns
-- -Wmissing-export-lists
-- -Wmissing-home-modules
-- -Wpartial-fields
-- -Wredundant-constraints
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wmissing-export-lists
+  - -Wmissing-home-modules
+  - -Wpartial-fields
+  - -Wredundant-constraints
 
 library:
   source-dirs: src
 
 executables:
   mezima-exe:
-    main:                Main.hs
-    source-dirs:         app
+    main: Main.hs
+    source-dirs: app
     dependencies:
-    - mezima
-    - optparse-simple
+      - mezima
+      - optparse-simple
 
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
 
 tests:
   mezima-test:
-    main:                Spec.hs
-    source-dirs:         test
+    main: Spec.hs
+    source-dirs: test
     dependencies:
-    - mezima
-    - hspec
-
+      - mezima
+      - hspec
+      - hspec-megaparsec
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
