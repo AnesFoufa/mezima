@@ -2,7 +2,7 @@ name: mezima
 version: 0.1.0.0
 github: githubuser/mezima
 license: BSD-3-Clause
-author: Author name here
+author: Anes Foufa
 maintainer: example@example.com
 copyright: 2024 Author name here
 
@@ -27,7 +27,6 @@ dependencies:
   - QuickCheck
 default-extensions:
   - NoImplicitPrelude
-  - OverloadedRecordDot
   - DuplicateRecordFields
   - BlockArguments
 

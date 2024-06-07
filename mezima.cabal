@@ -9,7 +9,7 @@ version:        0.1.0.0
 description:    Please see the README on Github at <https://github.com/githubuser/mezima#readme>
 homepage:       https://github.com/githubuser/mezima#readme
 bug-reports:    https://github.com/githubuser/mezima/issues
-author:         Author name here
+author:         Anes Foufa
 maintainer:     example@example.com
 copyright:      2024 Author name here
 license:        BSD-3-Clause
@@ -29,7 +29,6 @@ library
       Run
       SExp
       Types
-      Util
   other-modules:
       Paths_mezima
   autogen-modules:
@@ -38,7 +37,6 @@ library
       src
   default-extensions:
       NoImplicitPrelude
-      OverloadedRecordDot
       DuplicateRecordFields
       BlockArguments
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
@@ -60,7 +58,6 @@ executable mezima-exe
       app
   default-extensions:
       NoImplicitPrelude
-      OverloadedRecordDot
       DuplicateRecordFields
       BlockArguments
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
@@ -79,7 +76,6 @@ test-suite mezima-test
   main-is: Spec.hs
   other-modules:
       SExpSpec
-      UtilSpec
       Paths_mezima
   autogen-modules:
       Paths_mezima
@@ -87,7 +83,6 @@ test-suite mezima-test
       test
   default-extensions:
       NoImplicitPrelude
-      OverloadedRecordDot
       DuplicateRecordFields
       BlockArguments
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
