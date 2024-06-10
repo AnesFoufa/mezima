@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Import
+      Interpreter
       Run
       SExp
       Types
@@ -75,6 +76,7 @@ test-suite mezima-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      InterpreterSpec
       SExpSpec
       Paths_mezima
   autogen-modules:
