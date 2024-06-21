@@ -2,11 +2,12 @@
 
 module Main (main) where
 
-import Import
 import Options.Applicative.Simple
 import qualified Paths_mezima
+import RIO
 import RIO.Process
 import Run
+import Types
 
 main :: IO ()
 main = do
