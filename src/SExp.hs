@@ -53,7 +53,7 @@ bool = lexeme $ False <$ string "false" <|> True <$ string "true"
 
 numeric :: Parser SExp
 numeric = label "numeric" $ lexeme $ do
-    value <- L.signed skipSpace L.scientific
+    value <- L.scientific
     case floatingOrInteger value of
         Left d -> SDouble d <$ char' 'f'
         Right i -> do
@@ -65,7 +65,7 @@ numeric = label "numeric" $ lexeme $ do
 
 identifier :: Parser Identifier
 identifier = label "identifier" $ lexeme $ do
-    firstChar <- letterChar
+    firstChar <- letterChar <|> char '+'
     otherChars <- many alphaNumChar
     return Identifier{id = firstChar : otherChars}
 
@@ -85,4 +85,4 @@ atom =
         , SSExp <$> sexp
         ]
 sexpParser :: Parser SExp
-sexpParser = between skipSpace eof (SSExp <$> sexp)
+sexpParser = between skipSpace eof atom

@@ -15,8 +15,6 @@ spec = do
             parse atom "" "true" `shouldParse` SBool True
         it "parses 42" do
             parse atom "" "42" `shouldParse` SInteger 42
-        it "parses -42" do
-            parse atom "" "-42" `shouldParse` SInteger (-42)
         it "parses an identifier" do
             parse atom "" "foo" `shouldParse` SId (Identifier{id = "foo"})
         prop "parses all alphabetic identifiers" do
@@ -44,9 +42,7 @@ spec = do
             parse sexpParser "" "(42.1f)" `shouldParse` SSExp [SDouble 42.1]
         it "parses a double without a dot" do
             parse sexpParser "" "(42f)" `shouldParse` SSExp [SDouble 42.0]
-        it "parses a negative double" do
-            parse sexpParser "" "(-42f)" `shouldParse` SSExp [SDouble (-42.0)]
         it "parses an s expression preceded by white space" do
-            parse sexpParser "" "   (foo bar baz -23)   " `shouldParse` SSExp [SId (Identifier{id = "foo"}), SId (Identifier{id = "bar"}), SId (Identifier{id = "baz"}), SInteger (-23)]
+            parse sexpParser "" "   (foo bar baz 23)   " `shouldParse` SSExp [SId (Identifier{id = "foo"}), SId (Identifier{id = "bar"}), SId (Identifier{id = "baz"}), SInteger 23]
         it "doesn't parse when there is a non space remainder" do
             parse sexpParser "" `shouldFailOn` "    (1 2 3)    remainder"
