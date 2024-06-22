@@ -15,12 +15,16 @@ run = do
     let options = appOptions env
     let suffix = if optionsVerbose options then " Verbose !!!" else ""
     logInfo $ "We're inside the application!" <> suffix
-    line <- liftIO getLine
-    let res = parse sexpParser "" line
-    case res of
-        Left be -> logInfo $ fromString $ errorBundlePretty be
-        Right sexp -> do
-            logInfo $ fromString $ show sexp
-            case runEvaluator evaluator sexp of
-                Left ee -> logInfo $ fromString $ show ee
-                Right v -> logInfo $ fromString $ show $ represent v
+    repl
+  where
+    repl = do
+        line <- liftIO getLine
+        let res = parse sexpParser "" line
+        case res of
+            Left be -> logInfo $ fromString $ errorBundlePretty be
+            Right sexp -> do
+                logInfo $ fromString $ show sexp
+                case runEvaluator evaluator sexp of
+                    Left ee -> logInfo $ fromString $ show ee
+                    Right v -> logInfo $ fromString $ show $ represent v
+        repl

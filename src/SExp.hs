@@ -65,7 +65,7 @@ numeric = label "numeric" $ lexeme $ do
 
 identifier :: Parser Identifier
 identifier = label "identifier" $ lexeme $ do
-    firstChar <- letterChar <|> char '+'
+    firstChar <- letterChar <|> char '+' <|> char '*' <|> char '='
     otherChars <- many alphaNumChar
     return Identifier{id = firstChar : otherChars}
 
