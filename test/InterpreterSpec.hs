@@ -30,6 +30,7 @@ spec = do
     describe "evaluator numerics" do
         let sumIdentifier = SId (Identifier{id = "+"})
         let equalityIdentifier = SId (Identifier{id = "="})
+        let minusIdentifier = SId (Identifier{id = "-"})
         it "Evaluates empty sum as 0" do
             runEvaluator evaluator (SSExp [sumIdentifier]) `shouldBe` Right (VInteger 0)
         prop "should evaluate sum of integers as sum of integers" do
@@ -60,3 +61,15 @@ spec = do
             runEvaluator evaluator (SSExp (equalityIdentifier : SString "foo" : repeat (SInteger 42))) `shouldBe` Left VTypeError
         it "Lazily evaluates an equality returning False" do
             runEvaluator evaluator (SSExp (equalityIdentifier : SInteger 1 : SInteger 2 : repeat (SString "foo"))) `shouldBe` Right (VBool False)
+        it "Evaluates negative integers" do
+            runEvaluator evaluator (SSExp [minusIdentifier, SInteger 42]) `shouldBe` Right (VInteger (-42))
+        it "Evaluates negative doubles" do
+            runEvaluator evaluator (SSExp [minusIdentifier, SDouble 42.5]) `shouldBe` Right (VDouble (-42.5))
+        it "Evaluates negative of an EvaluationError as an EvaluationError" do
+            isLeft $ runEvaluator evaluator (SSExp [minusIdentifier, SSExp []])
+        it "Evaluates negative of an empty list as an VArityError" do
+            runEvaluator evaluator (SSExp [minusIdentifier]) `shouldBe` Left VArityError
+        it "Evaluates negative of many integers an VArityError" do
+            runEvaluator evaluator (SSExp [minusIdentifier, SInteger 42, SInteger 69]) `shouldBe` Left VArityError
+        it "Evaluates negative of many doubles an VArityError" do
+            runEvaluator evaluator (SSExp [minusIdentifier, SDouble 42.1, SDouble 69.0]) `shouldBe` Left VArityError

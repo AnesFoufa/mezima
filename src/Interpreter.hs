@@ -13,14 +13,15 @@ data Value
 
 represent :: Value -> SExp
 represent (VBool x) = SBool x
-represent (VDouble x) = SDouble x
-represent (VInteger x) = SInteger x
+represent (VDouble x) = if x > 0 then SDouble x else SSExp [_minusIdentifier, SDouble (-x)]
+represent (VInteger x) = if x > 0 then SInteger x else SSExp [_minusIdentifier, SInteger (-x)]
 represent (VString x) = SString x
 represent (VList xs) = SSExp (_listIdentifier : fmap represent xs)
 
 data EvaluationError
     = NotImplementedYet
     | VTypeError
+    | VArityError
     deriving (Show, Eq)
 
 type Evaluation = Either EvaluationError Value
@@ -37,6 +38,8 @@ _defaultEvaluate (SSExp (h : xs))
     | h == _sumIdentifier = _evaluateSum $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp (h : xs))
     | h == _prodIdentifier = _evaluateProd $ fmap _defaultEvaluate xs
+_defaultEvaluate (SSExp (h : xs))
+    | h == _minusIdentifier = _evaluateNegative $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp (h : xs))
     | h == _equalityIdentifier = _evaluateEq $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp _) = Left NotImplementedYet
@@ -86,6 +89,12 @@ _evaluateEq ((Right x) : rest) = foldr f (Right (VBool True)) rest
     numericDifferent _ _ = False
 _evaluateEq ((Left ee) : _) = Left ee
 
+_evaluateNegative :: [Evaluation] -> Evaluation
+_evaluateNegative [Right (VInteger i)] = Right $ VInteger (-i)
+_evaluateNegative [Right (VDouble i)] = Right $ VDouble (-i)
+_evaluateNegative (Left ee : _) = Left ee
+_evaluateNegative _ = Left VArityError
+
 _listIdentifier :: SExp
 _listIdentifier = SId (Identifier{id = "list"})
 
@@ -97,6 +106,9 @@ _prodIdentifier = SId (Identifier{id = "*"})
 
 _equalityIdentifier :: SExp
 _equalityIdentifier = SId (Identifier{id = "="})
+
+_minusIdentifier :: SExp
+_minusIdentifier = SId (Identifier{id = "-"})
 
 _isNotNumeric :: Value -> Bool
 _isNotNumeric (VInteger _) = False

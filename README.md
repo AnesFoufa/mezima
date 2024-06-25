@@ -15,7 +15,7 @@ Mezima means plot, scheme or conspiracy in the Hebrew language.
 - [x] Evaluate numeric sums
 - [x] Evaluate numeric products
 - [x] Evaluate numeric equality
-- [ ] Evaluate numeric negatives
+- [x] Evaluate numeric negatives
 - [ ] Evaluate numeric inversion and division
 - [ ] Evaluate logical operations
 - [ ] Define and evaluate global variables
