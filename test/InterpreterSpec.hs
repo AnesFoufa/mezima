@@ -9,10 +9,8 @@ import Test.Hspec.QuickCheck
 
 spec :: Spec
 spec = do
-    describe "evaluator" do
+    describe "evaluator basics" do
         let listIdentifier = SId (Identifier{id = "list"})
-        let sumIdentifier = SId (Identifier{id = "+"})
-        let equalityIdentifier = SId (Identifier{id = "="})
         prop "evaluates S Integer as S Integer" do
             \i -> runEvaluator evaluator (SInteger i) `shouldBe` Right (VInteger i)
         prop "evaluates S Double as S Double" do
@@ -29,6 +27,9 @@ spec = do
             runEvaluator evaluator (SSExp []) `shouldBe` Left NotImplementedYet
         it "Does not evaluate list with identifier" do
             runEvaluator evaluator (SSExp [SId (Identifier{id = "foo"})]) `shouldBe` Left NotImplementedYet
+    describe "evaluator numerics" do
+        let sumIdentifier = SId (Identifier{id = "+"})
+        let equalityIdentifier = SId (Identifier{id = "="})
         it "Evaluates empty sum as 0" do
             runEvaluator evaluator (SSExp [sumIdentifier]) `shouldBe` Right (VInteger 0)
         prop "should evaluate sum of integers as sum of integers" do
