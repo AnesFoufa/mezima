@@ -22,7 +22,15 @@ data SExp
     | SBool Bool -- false, true
     | SId Identifier -- foo
     | SDouble Double -- 42f, 23.5f, -1.25f
-    deriving (Show, Eq, Ord)
+    deriving (Eq, Ord)
+
+instance Show SExp where
+    show (SSExp sexps) = '(' : unwords (show <$> sexps) <> ")"
+    show (SBool x) = show x
+    show (SInteger x) = show x
+    show (SDouble x) = show x <> "f"
+    show (SString x) = show x
+    show (SId (Identifier{id = x})) = x
 
 instance Arbitrary SExp where
     arbitrary = sized sexp'
