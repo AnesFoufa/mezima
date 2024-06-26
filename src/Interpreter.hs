@@ -42,6 +42,8 @@ _defaultEvaluate (SSExp (h : xs))
     | h == _minusIdentifier = _evaluateNegative $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp (h : xs))
     | h == _equalityIdentifier = _evaluateEq $ fmap _defaultEvaluate xs
+_defaultEvaluate (SSExp (h : xs))
+    | h == _divisionIdentifier = _evaluateDiv $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp _) = Left NotImplementedYet
 _defaultEvaluate (SId _) = Left NotImplementedYet
 _defaultEvaluate (SBool x) = Right (VBool x)
@@ -95,6 +97,19 @@ _evaluateNegative [Right (VDouble i)] = Right $ VDouble (-i)
 _evaluateNegative (Left ee : _) = Left ee
 _evaluateNegative _ = Left VArityError
 
+_evaluateDiv :: [Evaluation] -> Evaluation
+_evaluateDiv [Right (VInteger i)] = Right $ VDouble (1 / fromIntegral i)
+_evaluateDiv [Right (VDouble i)] = Right $ VDouble (1 / i)
+_evaluateDiv [Right (VInteger i), Right (VInteger j)] = Right $ VDouble (fromIntegral i / fromIntegral j)
+_evaluateDiv [Right (VDouble i), Right (VDouble j)] = Right $ VDouble (i / j)
+_evaluateDiv [Right (VDouble i), Right (VInteger j)] = Right $ VDouble (i / fromIntegral j)
+_evaluateDiv [Right (VInteger i), Right (VDouble j)] = Right $ VDouble (fromIntegral i / j)
+_evaluateDiv ((Left ee) : _) = Left ee
+_evaluateDiv ((Right x) : _) | _isNotNumeric x = Left VTypeError
+_evaluateDiv (_ : (Left ee) : _) = Left ee
+_evaluateDiv (_ : (Right x) : _) | _isNotNumeric x = Left VTypeError
+_evaluateDiv _ = Left VArityError
+
 _listIdentifier :: SExp
 _listIdentifier = SId (Identifier{id = "list"})
 
@@ -109,6 +124,9 @@ _equalityIdentifier = SId (Identifier{id = "="})
 
 _minusIdentifier :: SExp
 _minusIdentifier = SId (Identifier{id = "-"})
+
+_divisionIdentifier :: SExp
+_divisionIdentifier = SId (Identifier{id = "/"})
 
 _isNotNumeric :: Value -> Bool
 _isNotNumeric (VInteger _) = False

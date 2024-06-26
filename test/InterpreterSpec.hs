@@ -17,8 +17,6 @@ spec = do
             \i -> runEvaluator evaluator (SDouble i) `shouldBe` Right (VDouble i)
         prop "evaluates S String as S String" do
             \i -> runEvaluator evaluator (SString i) `shouldBe` Right (VString i)
-        prop "Does not evaluate S Identifier" do
-            \i -> runEvaluator evaluator (SId (Identifier{id = i})) `shouldBe` Left NotImplementedYet
         it "Evaluates list prefixed as lists" do
             runEvaluator evaluator (SSExp [listIdentifier]) `shouldBe` Right (VList [])
         prop "Does not evaluate S Lists" do
@@ -31,6 +29,7 @@ spec = do
         let sumIdentifier = SId (Identifier{id = "+"})
         let equalityIdentifier = SId (Identifier{id = "="})
         let minusIdentifier = SId (Identifier{id = "-"})
+        let divisionIdentifier = SId (Identifier{id = "/"})
         it "Evaluates empty sum as 0" do
             runEvaluator evaluator (SSExp [sumIdentifier]) `shouldBe` Right (VInteger 0)
         prop "should evaluate sum of integers as sum of integers" do
@@ -73,3 +72,47 @@ spec = do
             runEvaluator evaluator (SSExp [minusIdentifier, SInteger 42, SInteger 69]) `shouldBe` Left VArityError
         it "Evaluates negative of many doubles an VArityError" do
             runEvaluator evaluator (SSExp [minusIdentifier, SDouble 42.1, SDouble 69.0]) `shouldBe` Left VArityError
+        it "Evaluates inversion of integers" do
+            runEvaluator evaluator (SSExp [divisionIdentifier, SInteger 2]) `shouldBe` Right (VDouble 0.5)
+        it "Evaluates inversion of doubles" do
+            runEvaluator evaluator (SSExp [divisionIdentifier, SDouble 0.5]) `shouldBe` Right (VDouble 2.0)
+        it "Evaluates division of integers" do
+            runEvaluator evaluator (SSExp [divisionIdentifier, SInteger 2, SInteger 4]) `shouldBe` Right (VDouble 0.5)
+        it "Evaluates division of doubles" do
+            runEvaluator evaluator (SSExp [divisionIdentifier, SDouble 2.0, SDouble 0.5]) `shouldBe` Right (VDouble 4.0)
+        it "Evaluates division of a double and an integer" do
+            runEvaluator evaluator (SSExp [divisionIdentifier, SDouble 2.0, SInteger 1]) `shouldBe` Right (VDouble 2.0)
+        it "Evaluates division of a integer and a double" do
+            runEvaluator evaluator (SSExp [divisionIdentifier, SInteger 1, SDouble 0.5]) `shouldBe` Right (VDouble 2.0)
+        it "Evaluates inversion of an EvaluationError as an EvaluationError" do
+            isLeft $ runEvaluator evaluator (SSExp [divisionIdentifier, SSExp [SString "foo"]])
+        it "Evaluates division of an EvaluationError as an EvaluationError" do
+            isLeft $ runEvaluator evaluator (SSExp [divisionIdentifier, SInteger 2, SSExp [SString "foo"]])
+        it "Evaluates inversion of an non numeric as VTypeError" do
+            isLeft $ runEvaluator evaluator (SSExp [divisionIdentifier, SString "foo"])
+        it "Evaluates inversion of an non numeric as VTypeError" do
+            isLeft $ runEvaluator evaluator (SSExp [divisionIdentifier, SInteger 2, SString "foo"])
+        it "Evaluates division of an EvaluationError and non numeric as EvaluationError" do
+            let arityErrorExpression = SSExp [minusIdentifier, SInteger 2, SInteger 2, SInteger 2]
+            runEvaluator
+                evaluator
+                ( SSExp
+                    [ divisionIdentifier
+                    , arityErrorExpression
+                    , SString "foo"
+                    ]
+                )
+                `shouldBe` Left VArityError
+        it "Evaluates division of a non numeric and an EvaluationError as VTypeError" do
+            let arityErrorExpression = SSExp [minusIdentifier, SInteger 2, SInteger 2, SInteger 2]
+            runEvaluator
+                evaluator
+                ( SSExp
+                    [ divisionIdentifier
+                    , SString "foo"
+                    , arityErrorExpression
+                    ]
+                )
+                `shouldBe` Left VTypeError
+        it "Evaluates a division oy more than two integers as an VArityError" do
+            runEvaluator evaluator (SSExp [divisionIdentifier, SInteger 42, SInteger 3, SInteger 6]) `shouldBe` Left VArityError
