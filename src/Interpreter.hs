@@ -50,6 +50,8 @@ _defaultEvaluate (SSExp (h : xs))
     | h == _disjunctionIdentifier = _evaluateOr $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp (h : xs))
     | h == _negationIdentifier = _evaluateNegation $ fmap _defaultEvaluate xs
+_defaultEvaluate (SSExp (h : xs))
+    | h == _ifIdentifier = _evaluateIfElse $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp _) = Left NotImplementedYet
 _defaultEvaluate (SId _) = Left NotImplementedYet
 _defaultEvaluate (SBool x) = Right (VBool x)
@@ -144,6 +146,13 @@ _evaluateOr = foldr f (Right (VBool False))
     f (Right (VBool False)) (Right (VBool v)) = Right (VBool v)
     f _ _ = Left VTypeError
 
+_evaluateIfElse :: [Evaluation] -> Evaluation
+_evaluateIfElse [Right (VBool True), x, _] = x
+_evaluateIfElse [Right (VBool False), _, x] = x
+_evaluateIfElse ((Right c) : _) | _isNotBoolean c = Left VTypeError
+_evaluateIfElse ((Left ee) : _) = Left ee
+_evaluateIfElse _ = Left VArityError
+
 _listIdentifier :: SExp
 _listIdentifier = SId (Identifier{id = "list"})
 
@@ -170,6 +179,9 @@ _disjunctionIdentifier = SId (Identifier{id = "or"})
 
 _negationIdentifier :: SExp
 _negationIdentifier = SId (Identifier{id = "neg"})
+
+_ifIdentifier :: SExp
+_ifIdentifier = SId (Identifier{id = "if"})
 
 _isNotNumeric :: Value -> Bool
 _isNotNumeric (VInteger _) = False
