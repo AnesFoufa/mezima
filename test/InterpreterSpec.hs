@@ -120,6 +120,7 @@ spec = do
             runEvaluator evaluator (SSExp [divisionIdentifier, SInteger 42, SInteger 3, SInteger 6]) `shouldBe` Left VArityError
     describe "logical operations" do
         let conjIdentifier = SId $ Identifier{id = "and"}
+        let disjunctionIdent = SId $ Identifier{id = "or"}
         prop "Evaluates conjunction of booleans" do
             \bs ->
                 runEvaluator
@@ -130,3 +131,13 @@ spec = do
                     `shouldBe` Right (VBool (and bs))
         it "Evaluates conjunction of non booleans as VTypeError" do
             runEvaluator evaluator (SSExp [conjIdentifier, SBool True, SString "foo"]) `shouldBe` Left VTypeError
+        prop "Evaluates disjunction of booleans" do
+            \bs ->
+                runEvaluator
+                    evaluator
+                    ( SSExp
+                        (disjunctionIdent : (SBool <$> bs))
+                    )
+                    `shouldBe` Right (VBool (or bs))
+        it "Evaluates conjunction of non booleans as VTypeError" do
+            runEvaluator evaluator (SSExp [disjunctionIdent, SBool False, SString "foo"]) `shouldBe` Left VTypeError
