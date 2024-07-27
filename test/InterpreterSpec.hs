@@ -1,7 +1,7 @@
 module InterpreterSpec (spec) where
 
 import Data.List (repeat)
-import Interpreter (EvaluationError (..), Value (..), evaluator, runEvaluator)
+import Interpreter (EvaluationError (..), Evaluator (runEvaluator), Value (..), evaluator, runEvaluator)
 import RIO
 import SExp
 import Test.Hspec
@@ -17,6 +17,8 @@ spec = do
             \i -> runEvaluator evaluator (SDouble i) `shouldBe` Right (VDouble i)
         prop "evaluates S String as S String" do
             \i -> runEvaluator evaluator (SString i) `shouldBe` Right (VString i)
+        prop "Does not evaluate S Identifier" do
+            \i -> runEvaluator evaluator (SId (Identifier{id = i})) `shouldBe` Left NotImplementedYet
         it "Evaluates list prefixed as lists" do
             runEvaluator evaluator (SSExp [listIdentifier]) `shouldBe` Right (VList [])
         prop "Does not evaluate S Lists" do
@@ -116,3 +118,15 @@ spec = do
                 `shouldBe` Left VTypeError
         it "Evaluates a division oy more than two integers as an VArityError" do
             runEvaluator evaluator (SSExp [divisionIdentifier, SInteger 42, SInteger 3, SInteger 6]) `shouldBe` Left VArityError
+    describe "logical operations" do
+        let conjIdentifier = SId $ Identifier{id = "and"}
+        prop "Evaluates conjunction of booleans" do
+            \bs ->
+                runEvaluator
+                    evaluator
+                    ( SSExp
+                        (conjIdentifier : (SBool <$> bs))
+                    )
+                    `shouldBe` Right (VBool (and bs))
+        it "Evaluates conjunction of non booleans as VTypeError" do
+            runEvaluator evaluator (SSExp [conjIdentifier, SBool True, SString "foo"]) `shouldBe` Left VTypeError

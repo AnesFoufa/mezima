@@ -44,6 +44,8 @@ _defaultEvaluate (SSExp (h : xs))
     | h == _equalityIdentifier = _evaluateEq $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp (h : xs))
     | h == _divisionIdentifier = _evaluateDiv $ fmap _defaultEvaluate xs
+_defaultEvaluate (SSExp (h : xs))
+    | h == _conjIdentifer = _evaluateAnd $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp _) = Left NotImplementedYet
 _defaultEvaluate (SId _) = Left NotImplementedYet
 _defaultEvaluate (SBool x) = Right (VBool x)
@@ -110,6 +112,15 @@ _evaluateDiv (_ : (Left ee) : _) = Left ee
 _evaluateDiv (_ : (Right x) : _) | _isNotNumeric x = Left VTypeError
 _evaluateDiv _ = Left VArityError
 
+_evaluateAnd :: [Evaluation] -> Evaluation
+_evaluateAnd = foldr f (Right (VBool True))
+  where
+    f (Right v) _ | _isNotBoolean v = Left VTypeError
+    f (Left ee) _ = Left ee
+    f (Right (VBool False)) _ = Right (VBool False)
+    f _ (Left ee) = Left ee
+    f (Right (VBool True)) (Right (VBool v)) = Right (VBool v)
+    f _ _ = Left VTypeError
 _listIdentifier :: SExp
 _listIdentifier = SId (Identifier{id = "list"})
 
@@ -128,7 +139,13 @@ _minusIdentifier = SId (Identifier{id = "-"})
 _divisionIdentifier :: SExp
 _divisionIdentifier = SId (Identifier{id = "/"})
 
+_conjIdentifer :: SExp
+_conjIdentifer = SId (Identifier{id = "and"})
+
 _isNotNumeric :: Value -> Bool
 _isNotNumeric (VInteger _) = False
 _isNotNumeric (VDouble _) = False
 _isNotNumeric _ = True
+_isNotBoolean :: Value -> Bool
+_isNotBoolean (VBool _) = False
+_isNotBoolean _ = True
