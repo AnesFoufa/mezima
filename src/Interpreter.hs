@@ -48,6 +48,8 @@ _defaultEvaluate (SSExp (h : xs))
     | h == _conjIdentifer = _evaluateAnd $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp (h : xs))
     | h == _disjunctionIdentifier = _evaluateOr $ fmap _defaultEvaluate xs
+_defaultEvaluate (SSExp (h : xs))
+    | h == _negationIdentifier = _evaluateNegation $ fmap _defaultEvaluate xs
 _defaultEvaluate (SSExp _) = Left NotImplementedYet
 _defaultEvaluate (SId _) = Left NotImplementedYet
 _defaultEvaluate (SBool x) = Right (VBool x)
@@ -99,7 +101,15 @@ _evaluateNegative :: [Evaluation] -> Evaluation
 _evaluateNegative [Right (VInteger i)] = Right $ VInteger (-i)
 _evaluateNegative [Right (VDouble i)] = Right $ VDouble (-i)
 _evaluateNegative (Left ee : _) = Left ee
+_evaluateNegative [_] = Left VTypeError
 _evaluateNegative _ = Left VArityError
+
+_evaluateNegation :: [Evaluation] -> Evaluation
+_evaluateNegation [Right (VBool True)] = Right $ VBool False
+_evaluateNegation [Right (VBool False)] = Right $ VBool True
+_evaluateNegation (Left ee : _) = Left ee
+_evaluateNegation [_] = Left VTypeError
+_evaluateNegation _ = Left VArityError
 
 _evaluateDiv :: [Evaluation] -> Evaluation
 _evaluateDiv [Right (VInteger i)] = Right $ VDouble (1 / fromIntegral i)
@@ -157,6 +167,9 @@ _conjIdentifer = SId (Identifier{id = "and"})
 
 _disjunctionIdentifier :: SExp
 _disjunctionIdentifier = SId (Identifier{id = "or"})
+
+_negationIdentifier :: SExp
+_negationIdentifier = SId (Identifier{id = "neg"})
 
 _isNotNumeric :: Value -> Bool
 _isNotNumeric (VInteger _) = False
