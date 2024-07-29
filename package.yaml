@@ -25,6 +25,7 @@ dependencies:
   - megaparsec
   - scientific
   - QuickCheck
+  - mtl
 default-extensions:
   - NoImplicitPrelude
   - DuplicateRecordFields

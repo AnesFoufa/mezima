@@ -2,6 +2,7 @@
 
 module Run (run) where
 
+import Control.Monad.State (runState)
 import Interpreter
 import RIO
 import SExp
@@ -15,16 +16,20 @@ run = do
     let options = appOptions env
     let suffix = if optionsVerbose options then " Verbose !!!" else ""
     logInfo $ "We're inside the application!" <> suffix
-    repl
+    let initState = mempty
+    repl initState
   where
-    repl = do
+    repl state = do
         line <- liftIO getLine
         let res = parse sexpParser "" line
         case res of
-            Left be -> logInfo $ fromString $ errorBundlePretty be
+            Left be -> do
+                logInfo $ fromString $ errorBundlePretty be
+                repl state
             Right sexp -> do
                 logInfo $ fromString $ show sexp
-                case runEvaluator evaluator sexp of
+                let (result, nState) = runState (runEvaluator evaluator sexp) state
+                case result of
                     Left ee -> logInfo $ fromString $ show ee
                     Right v -> logInfo $ fromString $ show $ represent v
-        repl
+                repl nState

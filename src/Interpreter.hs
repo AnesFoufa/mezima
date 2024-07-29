@@ -1,6 +1,9 @@
 module Interpreter (EvaluationError (..), Evaluator, runEvaluator, evaluator, represent, Value (..)) where
 
+import Control.Monad.State (State, get, put)
 import RIO
+import RIO.Map (insert)
+import qualified RIO.Map
 import SExp
 
 data Value
@@ -13,8 +16,8 @@ data Value
 
 represent :: Value -> SExp
 represent (VBool x) = SBool x
-represent (VDouble x) = if x > 0 then SDouble x else SSExp [_minusIdentifier, SDouble (-x)]
-represent (VInteger x) = if x > 0 then SInteger x else SSExp [_minusIdentifier, SInteger (-x)]
+represent (VDouble x) = if x >= 0 then SDouble x else SSExp [_minusIdentifier, SDouble (-x)]
+represent (VInteger x) = if x >= 0 then SInteger x else SSExp [_minusIdentifier, SInteger (-x)]
 represent (VString x) = SString x
 represent (VList xs) = SSExp (_listIdentifier : fmap represent xs)
 
@@ -25,39 +28,64 @@ data EvaluationError
     deriving (Show, Eq)
 
 type Evaluation = Either EvaluationError Value
+type SymbolsTable = Map String Value
 
-newtype Evaluator = Evaluator {runEvaluator :: SExp -> Evaluation}
+newtype Evaluator = Evaluator {runEvaluator :: SExp -> State SymbolsTable Evaluation}
 
 evaluator :: Evaluator
 evaluator = Evaluator{runEvaluator = _defaultEvaluate}
 
-_defaultEvaluate :: SExp -> Evaluation
+_defaultEvaluate :: SExp -> State SymbolsTable Evaluation
+_defaultEvaluate (SSExp (h : xs)) | h == _listIdentifier = do
+    evaluations <- mapM _defaultEvaluate xs
+    return (VList <$> sequence evaluations)
 _defaultEvaluate (SSExp (h : xs))
-    | h == _listIdentifier = VList <$> mapM _defaultEvaluate xs
+    | h == _sumIdentifier = _evaluateArgs xs _evaluateSum
 _defaultEvaluate (SSExp (h : xs))
-    | h == _sumIdentifier = _evaluateSum $ fmap _defaultEvaluate xs
+    | h == _prodIdentifier = _evaluateArgs xs _evaluateProd
 _defaultEvaluate (SSExp (h : xs))
-    | h == _prodIdentifier = _evaluateProd $ fmap _defaultEvaluate xs
+    | h == _minusIdentifier = _evaluateArgs xs _evaluateNegative
 _defaultEvaluate (SSExp (h : xs))
-    | h == _minusIdentifier = _evaluateNegative $ fmap _defaultEvaluate xs
+    | h == _equalityIdentifier = _evaluateArgs xs _evaluateEq
 _defaultEvaluate (SSExp (h : xs))
-    | h == _equalityIdentifier = _evaluateEq $ fmap _defaultEvaluate xs
+    | h == _divisionIdentifier = _evaluateArgs xs _evaluateDiv
 _defaultEvaluate (SSExp (h : xs))
-    | h == _divisionIdentifier = _evaluateDiv $ fmap _defaultEvaluate xs
+    | h == _conjIdentifer = _evaluateArgs xs _evaluateAnd
 _defaultEvaluate (SSExp (h : xs))
-    | h == _conjIdentifer = _evaluateAnd $ fmap _defaultEvaluate xs
+    | h == _disjunctionIdentifier = _evaluateArgs xs _evaluateOr
 _defaultEvaluate (SSExp (h : xs))
-    | h == _disjunctionIdentifier = _evaluateOr $ fmap _defaultEvaluate xs
+    | h == _negationIdentifier = _evaluateArgs xs _evaluateNegation
 _defaultEvaluate (SSExp (h : xs))
-    | h == _negationIdentifier = _evaluateNegation $ fmap _defaultEvaluate xs
+    | h == _ifIdentifier = _evaluateArgs xs _evaluateIfElse
 _defaultEvaluate (SSExp (h : xs))
-    | h == _ifIdentifier = _evaluateIfElse $ fmap _defaultEvaluate xs
-_defaultEvaluate (SSExp _) = Left NotImplementedYet
-_defaultEvaluate (SId _) = Left NotImplementedYet
-_defaultEvaluate (SBool x) = Right (VBool x)
-_defaultEvaluate (SDouble x) = Right (VDouble x)
-_defaultEvaluate (SInteger x) = Right (VInteger x)
-_defaultEvaluate (SString x) = Right (VString x)
+    | h == _defineIdentifier =
+        case xs of
+            [SId (Identifier{id = sid}), sexp] -> do
+                evaluation <- _defaultEvaluate sexp
+                case evaluation of
+                    Right value -> do
+                        symbolsTable <- get
+                        let updatedSymbolsTable = insert sid value symbolsTable
+                        put updatedSymbolsTable
+                        return $ Right value
+                    Left ee -> return $ Left ee
+            _ | length xs == 2 -> return $ Left VTypeError
+            _ -> return $ Left VArityError
+_defaultEvaluate (SId (Identifier{id = sid})) = do
+    symbolsTable <- get
+    case RIO.Map.lookup sid symbolsTable of
+        Just value -> return $ Right value
+        Nothing -> return $ Left NotImplementedYet
+_defaultEvaluate (SSExp _) = return $ Left NotImplementedYet
+_defaultEvaluate (SBool x) = return $ Right (VBool x)
+_defaultEvaluate (SDouble x) = return $ Right (VDouble x)
+_defaultEvaluate (SInteger x) = return $ Right (VInteger x)
+_defaultEvaluate (SString x) = return $ Right (VString x)
+
+_evaluateArgs :: [SExp] -> ([Evaluation] -> Evaluation) -> State SymbolsTable Evaluation
+_evaluateArgs args reduce = do
+    evaluations <- mapM _defaultEvaluate args
+    return $ reduce evaluations
 
 _evaluateSum :: [Evaluation] -> Evaluation
 _evaluateSum = foldr f (Right (VInteger 0))
@@ -182,6 +210,9 @@ _negationIdentifier = SId (Identifier{id = "neg"})
 
 _ifIdentifier :: SExp
 _ifIdentifier = SId (Identifier{id = "if"})
+
+_defineIdentifier :: SExp
+_defineIdentifier = SId (Identifier{id = "def"})
 
 _isNotNumeric :: Value -> Bool
 _isNotNumeric (VInteger _) = False
