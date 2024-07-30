@@ -1,10 +1,16 @@
+{-# LANGUAGE BangPatterns #-}
+
 module Interpreter (EvaluationError (..), Evaluator, runEvaluator, evaluator, represent, Value (..)) where
 
-import Control.Monad.State (State, get, put)
+import Control.Monad.State (State, evalState, get, put)
 import RIO
+import qualified RIO.List
 import RIO.Map (insert)
 import qualified RIO.Map
 import SExp
+
+-- import GHC.IO (unsafePerformIO)
+-- import qualified Prelude
 
 data Value
     = VBool Bool
@@ -12,6 +18,7 @@ data Value
     | VInteger Integer
     | VString String
     | VList [Value]
+    | VFunction [String] SExp
     deriving (Eq, Show)
 
 represent :: Value -> SExp
@@ -20,6 +27,7 @@ represent (VDouble x) = if x >= 0 then SDouble x else SSExp [_minusIdentifier, S
 represent (VInteger x) = if x >= 0 then SInteger x else SSExp [_minusIdentifier, SInteger (-x)]
 represent (VString x) = SString x
 represent (VList xs) = SSExp (_listIdentifier : fmap represent xs)
+represent (VFunction _ _) = SId (Identifier{id = "function"})
 
 data EvaluationError
     = NotImplementedYet
@@ -28,7 +36,7 @@ data EvaluationError
     deriving (Show, Eq)
 
 type Evaluation = Either EvaluationError Value
-type SymbolsTable = Map String Value
+type SymbolsTable = [Map String Value]
 
 newtype Evaluator = Evaluator {runEvaluator :: SExp -> State SymbolsTable Evaluation}
 
@@ -58,25 +66,76 @@ _defaultEvaluate (SSExp (h : xs))
 _defaultEvaluate (SSExp (h : xs))
     | h == _ifIdentifier = _evaluateArgs xs _evaluateIfElse
 _defaultEvaluate (SSExp (h : xs))
+    | h == _functionIdentifier =
+        case xs of
+            [identifiers, expression] -> return $ _defineFunction identifiers expression
+            _ -> return $ Left VArityError
+_defaultEvaluate (SSExp (h : xs))
     | h == _defineIdentifier =
         case xs of
             [SId (Identifier{id = sid}), sexp] -> do
                 evaluation <- _defaultEvaluate sexp
+                symbolsTable <- get
+                let st0 = fromMaybe mempty $ RIO.List.headMaybe symbolsTable
+                let sts = fromMaybe [] $ RIO.List.tailMaybe symbolsTable
                 case evaluation of
                     Right value -> do
-                        symbolsTable <- get
-                        let updatedSymbolsTable = insert sid value symbolsTable
-                        put updatedSymbolsTable
+                        let updatedSymbolsTable = insert sid value st0
+                        put (updatedSymbolsTable : sts)
                         return $ Right value
                     Left ee -> return $ Left ee
             _ | length xs == 2 -> return $ Left VTypeError
             _ -> return $ Left VArityError
+_defaultEvaluate (SSExp (h : xs))
+    | h == _defineFunctionIdentifier =
+        case xs of
+            [functionName, parameters, body] ->
+                _defaultEvaluate
+                    ( SSExp
+                        [ _defineIdentifier
+                        , functionName
+                        , SSExp [_functionIdentifier, parameters, body]
+                        ]
+                    )
+            _ -> return $ Left VArityError
+_defaultEvaluate (SSExp (h : xs)) = do
+    hValue <- _defaultEvaluate h
+    case hValue of
+        Right (VFunction params body) -> do
+            {-
+            let !_ = unsafePerformIO (Prelude.print "params")
+            let !_ = unsafePerformIO (Prelude.print params)
+            let !_ = unsafePerformIO (Prelude.print "body")
+            let !_ = unsafePerformIO $ Prelude.print body
+            let !_ = unsafePerformIO $ Prelude.print "xs"
+            let !_ = unsafePerformIO $ Prelude.print xs
+            -}
+            symbolsTable <- get
+            evaluations <- mapM _defaultEvaluate xs
+            {-
+            let !_ = unsafePerformIO $ Prelude.print "evaluations"
+            let !_ = unsafePerformIO $ Prelude.print evaluations
+            -}
+            let upToDateSymbolsTable = _updateSymbolsTable params evaluations
+            {-
+            let !_ = unsafePerformIO (Prelude.print "state")
+            let !_ = unsafePerformIO $ Prelude.print (upToDateSymbolsTable : symbolsTable)
+            let !_ = unsafePerformIO Prelude.getLine
+            -}
+            let res = evalState (_defaultEvaluate body) (upToDateSymbolsTable : symbolsTable)
+            {-
+            let !_ = unsafePerformIO (Prelude.print "res")
+            let !_ = unsafePerformIO (Prelude.print res)
+            -}
+            return res
+        Right _ -> return $ Left VTypeError
+        Left ee -> return $ Left ee
+_defaultEvaluate (SSExp _) = return $ Left NotImplementedYet
 _defaultEvaluate (SId (Identifier{id = sid})) = do
     symbolsTable <- get
-    case RIO.Map.lookup sid symbolsTable of
+    case _lookupSt sid symbolsTable of
         Just value -> return $ Right value
         Nothing -> return $ Left NotImplementedYet
-_defaultEvaluate (SSExp _) = return $ Left NotImplementedYet
 _defaultEvaluate (SBool x) = return $ Right (VBool x)
 _defaultEvaluate (SDouble x) = return $ Right (VDouble x)
 _defaultEvaluate (SInteger x) = return $ Right (VInteger x)
@@ -181,6 +240,26 @@ _evaluateIfElse ((Right c) : _) | _isNotBoolean c = Left VTypeError
 _evaluateIfElse ((Left ee) : _) = Left ee
 _evaluateIfElse _ = Left VArityError
 
+_defineFunction :: SExp -> SExp -> Evaluation
+_defineFunction (SSExp maybeIdentifiers) sexp = do
+    identifiers <- mapM _parseId maybeIdentifiers
+    Right (VFunction identifiers sexp)
+_defineFunction _ _ = Left VTypeError
+
+_updateSymbolsTable :: [String] -> [Evaluation] -> Map String Value
+_updateSymbolsTable formalParams params = foldr f mempty (zip formalParams params)
+  where
+    f (_, Left _) st_ = st_
+    f (s, Right v) st_ = insert s v st_
+_parseId :: SExp -> Either EvaluationError String
+_parseId (SId (Identifier{id = identifier})) = Right identifier
+_parseId _ = Left VTypeError
+
+_lookupSt :: String -> SymbolsTable -> Maybe Value
+_lookupSt _ [] = Nothing
+_lookupSt k (h : rest) = case RIO.Map.lookup k h of
+    Nothing -> _lookupSt k rest
+    Just x -> Just x
 _listIdentifier :: SExp
 _listIdentifier = SId (Identifier{id = "list"})
 
@@ -213,6 +292,12 @@ _ifIdentifier = SId (Identifier{id = "if"})
 
 _defineIdentifier :: SExp
 _defineIdentifier = SId (Identifier{id = "def"})
+
+_functionIdentifier :: SExp
+_functionIdentifier = SId (Identifier{id = "fn"})
+
+_defineFunctionIdentifier :: SExp
+_defineFunctionIdentifier = SId (Identifier{id = "defn"})
 
 _isNotNumeric :: Value -> Bool
 _isNotNumeric (VInteger _) = False

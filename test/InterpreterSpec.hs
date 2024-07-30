@@ -10,7 +10,7 @@ import Test.Hspec.QuickCheck
 
 spec :: Spec
 spec = do
-    let evaluates sexp = evalState (runEvaluator evaluator sexp) mempty
+    let evaluates sexp = evalState (runEvaluator evaluator sexp) [mempty]
     describe "evaluator basics" do
         let listIdentifier = SId (Identifier{id = "list"})
         prop "evaluates S Integer as S Integer" do
@@ -19,12 +19,8 @@ spec = do
             \i -> evaluates (SDouble i) `shouldBe` Right (VDouble i)
         prop "evaluates S String as S String" do
             \i -> evaluates (SString i) `shouldBe` Right (VString i)
-        prop "Does not evaluate S Identifier" do
-            \i -> evaluates (SId (Identifier{id = i})) `shouldBe` Left NotImplementedYet
         it "Evaluates list prefixed as lists" do
             evaluates (SSExp [listIdentifier]) `shouldBe` Right (VList [])
-        prop "Does not evaluate S Lists" do
-            \i -> evaluates (SSExp i) `shouldBe` Left NotImplementedYet
         it "Does not evaluate empty list" do
             evaluates (SSExp []) `shouldBe` Left NotImplementedYet
         it "Does not evaluate list with identifier" do

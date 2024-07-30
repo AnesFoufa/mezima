@@ -16,7 +16,7 @@ run = do
     let options = appOptions env
     let suffix = if optionsVerbose options then " Verbose !!!" else ""
     logInfo $ "We're inside the application!" <> suffix
-    let initState = mempty
+    let initState = [mempty]
     repl initState
   where
     repl state = do
