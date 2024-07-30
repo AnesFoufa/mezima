@@ -26,6 +26,7 @@ dependencies:
   - scientific
   - QuickCheck
   - mtl
+  - haskeline
 default-extensions:
   - NoImplicitPrelude
   - DuplicateRecordFields
