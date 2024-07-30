@@ -1,6 +1,6 @@
-{-# LANGUAGE BangPatterns #-}
+-- {-# LANGUAGE BangPatterns #-}
 
-module Interpreter (EvaluationError (..), Evaluator, runEvaluator, evaluator, represent, Value (..)) where
+module Interpreter (EvaluationError (..), Evaluator, runEvaluator, evaluator, represent, Value (..), SymbolsTable) where
 
 import Control.Monad.State (State, evalState, get, put)
 import RIO
@@ -27,7 +27,10 @@ represent (VDouble x) = if x >= 0 then SDouble x else SSExp [_minusIdentifier, S
 represent (VInteger x) = if x >= 0 then SInteger x else SSExp [_minusIdentifier, SInteger (-x)]
 represent (VString x) = SString x
 represent (VList xs) = SSExp (_listIdentifier : fmap represent xs)
-represent (VFunction _ _) = SId (Identifier{id = "function"})
+represent (VFunction params body) = SSExp [_functionIdentifier, SSExp paramsIds, body]
+  where
+    paramsIds = identifier <$> params
+    identifier s = SId Identifier{id = s}
 
 data EvaluationError
     = NotImplementedYet
@@ -84,7 +87,7 @@ _defaultEvaluate (SSExp (h : xs))
                         put (updatedSymbolsTable : sts)
                         return $ Right value
                     Left ee -> return $ Left ee
-            _ | length xs == 2 -> return $ Left VTypeError
+            [_, _] -> return $ Left VTypeError
             _ -> return $ Left VArityError
 _defaultEvaluate (SSExp (h : xs))
     | h == _defineFunctionIdentifier =
@@ -110,8 +113,8 @@ _defaultEvaluate (SSExp (h : xs)) = do
             let !_ = unsafePerformIO $ Prelude.print "xs"
             let !_ = unsafePerformIO $ Prelude.print xs
             -}
-            symbolsTable <- get
             evaluations <- mapM _defaultEvaluate xs
+            symbolsTable <- get
             {-
             let !_ = unsafePerformIO $ Prelude.print "evaluations"
             let !_ = unsafePerformIO $ Prelude.print evaluations
