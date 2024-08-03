@@ -28,7 +28,7 @@ represent (VFunction params body _) = SSExp [_functionIdentifier, SSExp paramsId
     identifier s = SId Identifier{id = s}
 
 data EvaluationError
-    = NotImplementedYet
+    = IdentifierError String
     | VTypeError
     | VArityError
     deriving (Show, Eq)
@@ -103,12 +103,12 @@ _defaultEvaluate (SSExp (h : xs)) = do
                     return res
         Right _ -> return $ Left VTypeError
         Left ee -> return $ Left ee
-_defaultEvaluate (SSExp _) = return $ Left NotImplementedYet
+_defaultEvaluate (SSExp []) = return $ Left VTypeError
 _defaultEvaluate (SId (Identifier{id = sid})) = do
     symbolsTable <- get
     case _lookupSt sid symbolsTable of
         Just value -> return $ Right value
-        Nothing -> return $ Left NotImplementedYet
+        Nothing -> return $ Left $ IdentifierError sid
 _defaultEvaluate (SBool x) = return $ Right (VBool x)
 _defaultEvaluate (SDouble x) = return $ Right (VDouble x)
 _defaultEvaluate (SInteger x) = return $ Right (VInteger x)

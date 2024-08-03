@@ -22,9 +22,9 @@ spec = do
         it "Evaluates list prefixed as lists" do
             evaluates (SSExp [listIdentifier]) `shouldBe` Right (VList [])
         it "Does not evaluate empty list" do
-            evaluates (SSExp []) `shouldBe` Left NotImplementedYet
+            evaluates (SSExp []) `shouldBe` Left VTypeError
         it "Does not evaluate list with identifier" do
-            evaluates (SSExp [SId (Identifier{id = "foo"})]) `shouldBe` Left NotImplementedYet
+            evaluates (SSExp [SId (Identifier{id = "foo"})]) `shouldBe` Left (IdentifierError "foo")
     describe "evaluator numerics" do
         let sumIdentifier = SId (Identifier{id = "+"})
         let equalityIdentifier = SId (Identifier{id = "="})
