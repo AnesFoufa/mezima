@@ -98,7 +98,9 @@ _defaultEvaluate (SSExp (h : xs)) = do
                 Right values -> do
                     symbolsTable <- get
                     let argsSymbolsTable = _argsSymbolsTable params values
-                    let state' = argsSymbolsTable : enclosingSymbols : symbolsTable
+                    let self = VFunction params body enclosingSymbols
+                    let localSymbolsTable = insert "self" self argsSymbolsTable
+                    let state' = localSymbolsTable : enclosingSymbols : symbolsTable
                     let res = evalState (_defaultEvaluate body) state'
                     return res
         Right _ -> return $ Left VTypeError
