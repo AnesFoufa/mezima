@@ -1,5 +1,3 @@
--- {-# LANGUAGE BangPatterns #-}
-
 module Interpreter (EvaluationError (..), Evaluator, runEvaluator, evaluator, represent, Value (..), SymbolsTable) where
 
 import Control.Monad.State (State, evalState, get, put)
@@ -95,10 +93,14 @@ _defaultEvaluate (SSExp (h : xs)) = do
     case hValue of
         Right (VFunction params body enclosingSymbols) -> do
             evaluations <- mapM _defaultEvaluate xs
-            symbolsTable <- get
-            let upToDateSymbolsTable = _updateSymbolsTable params evaluations
-            let res = evalState (_defaultEvaluate body) (upToDateSymbolsTable : enclosingSymbols : symbolsTable)
-            return res
+            case sequence evaluations of
+                Left evaluationError -> return $ Left evaluationError
+                Right values -> do
+                    symbolsTable <- get
+                    let argsSymbolsTable = _argsSymbolsTable params values
+                    let state' = argsSymbolsTable : enclosingSymbols : symbolsTable
+                    let res = evalState (_defaultEvaluate body) state'
+                    return res
         Right _ -> return $ Left VTypeError
         Left ee -> return $ Left ee
 _defaultEvaluate (SSExp _) = return $ Left NotImplementedYet
@@ -231,11 +233,10 @@ _defineFunction symbolsTable (SSExp maybeIdentifiers) sexp = do
     Right (VFunction identifiers sexp enclosingSymbols)
 _defineFunction _ _ _ = Left VTypeError
 
-_updateSymbolsTable :: [String] -> [Evaluation] -> Map String Value
-_updateSymbolsTable formalParams params = foldr f mempty (zip formalParams params)
+_argsSymbolsTable :: [String] -> [Value] -> Map String Value
+_argsSymbolsTable formalParams params = foldr f mempty (zip formalParams params)
   where
-    f (_, Left _) st_ = st_
-    f (s, Right v) st_ = insert s v st_
+    f (s, v) = insert s v
 _parseId :: SExp -> Either EvaluationError String
 _parseId (SId (Identifier{id = identifier})) = Right identifier
 _parseId _ = Left VTypeError
