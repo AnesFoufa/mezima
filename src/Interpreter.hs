@@ -76,17 +76,7 @@ _defaultEvaluate (SSExp (h : xs))
 _defaultEvaluate (SSExp (h : xs))
     | h == _defineIdentifier =
         case xs of
-            [SId (Identifier{id = sid}), sexp] -> do
-                evaluation <- _defaultEvaluate sexp
-                symbolsTable <- get
-                let st0 = fromMaybe mempty $ RIO.List.headMaybe symbolsTable
-                let sts = fromMaybe [] $ RIO.List.tailMaybe symbolsTable
-                case evaluation of
-                    Right value -> do
-                        let updatedSymbolsTable = insert sid value st0
-                        put (updatedSymbolsTable : sts)
-                        return $ Right value
-                    Left ee -> return $ Left ee
+            [SId (Identifier{id = sid}), sexp] -> _evaluateDefine sid sexp
             [_, _] -> return $ Left VTypeError
             _ -> return $ Left VArityError
 _defaultEvaluate (SSExp (h : xs))
@@ -242,6 +232,19 @@ _evaluateIfElse [Right (VBool False), _, x] = x
 _evaluateIfElse ((Right c) : _) | _isNotBoolean c = Left VTypeError
 _evaluateIfElse ((Left ee) : _) = Left ee
 _evaluateIfElse _ = Left VArityError
+
+_evaluateDefine :: String -> SExp -> State SymbolsTable Evaluation
+_evaluateDefine sid sexp = do
+    evaluation <- _defaultEvaluate sexp
+    case evaluation of
+        Right value -> do
+            symbolsTable <- get
+            let st0 = fromMaybe mempty $ RIO.List.headMaybe symbolsTable
+            let sts = fromMaybe [] $ RIO.List.tailMaybe symbolsTable
+            let updatedSymbolsTable = insert sid value st0
+            put (updatedSymbolsTable : sts)
+            return $ Right value
+        Left ee -> return $ Left ee
 
 _defineFunction :: SExp -> SExp -> Evaluation
 _defineFunction (SSExp maybeIdentifiers) sexp = do
