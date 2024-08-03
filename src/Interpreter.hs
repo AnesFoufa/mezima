@@ -5,12 +5,9 @@ module Interpreter (EvaluationError (..), Evaluator, runEvaluator, evaluator, re
 import Control.Monad.State (State, evalState, get, put)
 import RIO
 import qualified RIO.List
-import RIO.Map (insert)
+import RIO.Map (insert, union)
 import qualified RIO.Map
 import SExp
-
--- import GHC.IO (unsafePerformIO)
--- import qualified Prelude
 
 data Value
     = VBool Bool
@@ -18,7 +15,7 @@ data Value
     | VInteger Integer
     | VString String
     | VList [Value]
-    | VFunction [String] SExp
+    | VFunction [String] SExp (Map String Value)
     deriving (Eq, Show)
 
 represent :: Value -> SExp
@@ -27,7 +24,7 @@ represent (VDouble x) = if x >= 0 then SDouble x else SSExp [_minusIdentifier, S
 represent (VInteger x) = if x >= 0 then SInteger x else SSExp [_minusIdentifier, SInteger (-x)]
 represent (VString x) = SString x
 represent (VList xs) = SSExp (_listIdentifier : fmap represent xs)
-represent (VFunction params body) = SSExp [_functionIdentifier, SSExp paramsIds, body]
+represent (VFunction params body _) = SSExp [_functionIdentifier, SSExp paramsIds, body]
   where
     paramsIds = identifier <$> params
     identifier s = SId Identifier{id = s}
@@ -71,7 +68,9 @@ _defaultEvaluate (SSExp (h : xs))
 _defaultEvaluate (SSExp (h : xs))
     | h == _functionIdentifier =
         case xs of
-            [identifiers, expression] -> return $ _defineFunction identifiers expression
+            [identifiers, expression] -> do
+                symbolsTable <- get
+                return $ _defineFunction symbolsTable identifiers expression
             _ -> return $ Left VArityError
 _defaultEvaluate (SSExp (h : xs))
     | h == _defineIdentifier =
@@ -94,32 +93,11 @@ _defaultEvaluate (SSExp (h : xs))
 _defaultEvaluate (SSExp (h : xs)) = do
     hValue <- _defaultEvaluate h
     case hValue of
-        Right (VFunction params body) -> do
-            {-
-            let !_ = unsafePerformIO (Prelude.print "params")
-            let !_ = unsafePerformIO (Prelude.print params)
-            let !_ = unsafePerformIO (Prelude.print "body")
-            let !_ = unsafePerformIO $ Prelude.print body
-            let !_ = unsafePerformIO $ Prelude.print "xs"
-            let !_ = unsafePerformIO $ Prelude.print xs
-            -}
+        Right (VFunction params body enclosingSymbols) -> do
             evaluations <- mapM _defaultEvaluate xs
             symbolsTable <- get
-            {-
-            let !_ = unsafePerformIO $ Prelude.print "evaluations"
-            let !_ = unsafePerformIO $ Prelude.print evaluations
-            -}
             let upToDateSymbolsTable = _updateSymbolsTable params evaluations
-            {-
-            let !_ = unsafePerformIO (Prelude.print "state")
-            let !_ = unsafePerformIO $ Prelude.print (upToDateSymbolsTable : symbolsTable)
-            let !_ = unsafePerformIO Prelude.getLine
-            -}
-            let res = evalState (_defaultEvaluate body) (upToDateSymbolsTable : symbolsTable)
-            {-
-            let !_ = unsafePerformIO (Prelude.print "res")
-            let !_ = unsafePerformIO (Prelude.print res)
-            -}
+            let res = evalState (_defaultEvaluate body) (upToDateSymbolsTable : enclosingSymbols : symbolsTable)
             return res
         Right _ -> return $ Left VTypeError
         Left ee -> return $ Left ee
@@ -246,11 +224,12 @@ _evaluateDefine sid sexp = do
             return $ Right value
         Left ee -> return $ Left ee
 
-_defineFunction :: SExp -> SExp -> Evaluation
-_defineFunction (SSExp maybeIdentifiers) sexp = do
+_defineFunction :: SymbolsTable -> SExp -> SExp -> Evaluation
+_defineFunction symbolsTable (SSExp maybeIdentifiers) sexp = do
     identifiers <- mapM _parseId maybeIdentifiers
-    Right (VFunction identifiers sexp)
-_defineFunction _ _ = Left VTypeError
+    let enclosingSymbols = _getEnclosingSymbols symbolsTable sexp
+    Right (VFunction identifiers sexp enclosingSymbols)
+_defineFunction _ _ _ = Left VTypeError
 
 _updateSymbolsTable :: [String] -> [Evaluation] -> Map String Value
 _updateSymbolsTable formalParams params = foldr f mempty (zip formalParams params)
@@ -266,6 +245,17 @@ _lookupSt _ [] = Nothing
 _lookupSt k (h : rest) = case RIO.Map.lookup k h of
     Nothing -> _lookupSt k rest
     Just x -> Just x
+
+_getEnclosingSymbols :: SymbolsTable -> SExp -> Map String Value
+_getEnclosingSymbols symbolsTable (SSExp sexps) = foldr f mempty sexps
+  where
+    f sexp symbols = symbols `union` _getEnclosingSymbols symbolsTable sexp
+_getEnclosingSymbols symbolsTable (SId (Identifier{id = id_})) =
+    case _lookupSt id_ symbolsTable of
+        Just v -> insert id_ v mempty
+        Nothing -> mempty
+_getEnclosingSymbols _ _ = mempty
+
 _listIdentifier :: SExp
 _listIdentifier = SId (Identifier{id = "list"})
 
