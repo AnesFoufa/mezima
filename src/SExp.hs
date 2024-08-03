@@ -1,5 +1,6 @@
 module SExp (SExp (..), Identifier (..), atom, sexpParser) where
 
+import Data.Char (toLower)
 import Data.Scientific
 import RIO hiding (bool, many, some, try)
 import Test.QuickCheck (oneof, resize, sized)
@@ -26,7 +27,7 @@ data SExp
 
 instance Show SExp where
     show (SSExp sexps) = '(' : unwords (show <$> sexps) <> ")"
-    show (SBool x) = show x
+    show (SBool x) = toLower <$> show x
     show (SInteger x) = show x
     show (SDouble x) = show x <> "f"
     show (SString x) = show x
