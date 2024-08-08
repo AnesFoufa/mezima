@@ -1,11 +1,21 @@
-module Interpreter (EvaluationError (..), Evaluator, runEvaluator, evaluator, represent, Value (..), SymbolsTable) where
+module Interpreter (EvaluationError (..), Evaluator, runEvaluator, evaluator, SymbolsTable, initSymbolsTable) where
 
 import Control.Monad.State (State, evalState, get, put)
 import RIO
-import qualified RIO.List
 import RIO.Map (insert, union)
 import qualified RIO.Map
 import SExp
+
+type Evaluation = Either EvaluationError SExp
+newtype Evaluator = Evaluator {runEvaluator :: SExp -> State SymbolsTable Evaluation}
+
+evaluator :: Evaluator
+evaluator = Evaluator{runEvaluator = _runEvaluator}
+
+_runEvaluator :: SExp -> State SymbolsTable Evaluation
+_runEvaluator sexp = do
+    vEvaluation <- _defaultEvaluate sexp
+    return (represent <$> vEvaluation)
 
 data Value
     = VBool Bool
@@ -33,15 +43,13 @@ data EvaluationError
     | VArityError
     deriving (Show, Eq)
 
-type Evaluation = Either EvaluationError Value
-type SymbolsTable = [Map String Value]
+type VEvaluation = Either EvaluationError Value
+type SymbolsTable = Map String Value
 
-newtype Evaluator = Evaluator {runEvaluator :: SExp -> State SymbolsTable Evaluation}
+initSymbolsTable :: SymbolsTable
+initSymbolsTable = mempty
 
-evaluator :: Evaluator
-evaluator = Evaluator{runEvaluator = _defaultEvaluate}
-
-_defaultEvaluate :: SExp -> State SymbolsTable Evaluation
+_defaultEvaluate :: SExp -> State SymbolsTable VEvaluation
 _defaultEvaluate (SSExp (h : xs)) | h == _listIdentifier = do
     evaluations <- mapM _defaultEvaluate xs
     return (VList <$> sequence evaluations)
@@ -100,7 +108,7 @@ _defaultEvaluate (SSExp (h : xs)) = do
                     let argsSymbolsTable = _argsSymbolsTable params values
                     let self = VFunction params body enclosingSymbols
                     let localSymbolsTable = insert "self" self argsSymbolsTable
-                    let state' = localSymbolsTable : enclosingSymbols : symbolsTable
+                    let state' = (localSymbolsTable `union` enclosingSymbols) `union` symbolsTable
                     let res = evalState (_defaultEvaluate body) state'
                     return res
         Right _ -> return $ Left VTypeError
@@ -108,7 +116,7 @@ _defaultEvaluate (SSExp (h : xs)) = do
 _defaultEvaluate (SSExp []) = return $ Left VTypeError
 _defaultEvaluate (SId (Identifier{id = sid})) = do
     symbolsTable <- get
-    case _lookupSt sid symbolsTable of
+    case RIO.Map.lookup sid symbolsTable of
         Just value -> return $ Right value
         Nothing -> return $ Left $ IdentifierError sid
 _defaultEvaluate (SBool x) = return $ Right (VBool x)
@@ -116,12 +124,12 @@ _defaultEvaluate (SDouble x) = return $ Right (VDouble x)
 _defaultEvaluate (SInteger x) = return $ Right (VInteger x)
 _defaultEvaluate (SString x) = return $ Right (VString x)
 
-_evaluateArgs :: [SExp] -> ([Evaluation] -> Evaluation) -> State SymbolsTable Evaluation
+_evaluateArgs :: [SExp] -> ([VEvaluation] -> VEvaluation) -> State SymbolsTable VEvaluation
 _evaluateArgs args reduce = do
     evaluations <- mapM _defaultEvaluate args
     return $ reduce evaluations
 
-_evaluateSum :: [Evaluation] -> Evaluation
+_evaluateSum :: [VEvaluation] -> VEvaluation
 _evaluateSum = foldr f (Right (VInteger 0))
   where
     f (Right v) _ | _isNotNumeric v = Left VTypeError
@@ -133,7 +141,7 @@ _evaluateSum = foldr f (Right (VInteger 0))
     f (Right (VDouble a)) (Right (VInteger b)) = Right (VDouble (a + fromIntegral b))
     f _ _ = Left VTypeError
 
-_evaluateProd :: [Evaluation] -> Evaluation
+_evaluateProd :: [VEvaluation] -> VEvaluation
 _evaluateProd = foldr f (Right (VInteger 1))
   where
     f (Right v) _ | _isNotNumeric v = Left VTypeError
@@ -145,7 +153,7 @@ _evaluateProd = foldr f (Right (VInteger 1))
     f (Right (VDouble a)) (Right (VInteger b)) = Right (VDouble (a * fromIntegral b))
     f _ _ = Left VTypeError
 
-_evaluateEq :: [Evaluation] -> Evaluation
+_evaluateEq :: [VEvaluation] -> VEvaluation
 _evaluateEq [] = Right $ VBool True
 _evaluateEq ((Right x) : _) | _isNotNumeric x = Left VTypeError
 _evaluateEq ((Right x) : rest) = foldr f (Right (VBool True)) rest
@@ -161,21 +169,21 @@ _evaluateEq ((Right x) : rest) = foldr f (Right (VBool True)) rest
     numericDifferent _ _ = False
 _evaluateEq ((Left ee) : _) = Left ee
 
-_evaluateNegative :: [Evaluation] -> Evaluation
+_evaluateNegative :: [VEvaluation] -> VEvaluation
 _evaluateNegative [Right (VInteger i)] = Right $ VInteger (-i)
 _evaluateNegative [Right (VDouble i)] = Right $ VDouble (-i)
 _evaluateNegative (Left ee : _) = Left ee
 _evaluateNegative [_] = Left VTypeError
 _evaluateNegative _ = Left VArityError
 
-_evaluateNegation :: [Evaluation] -> Evaluation
+_evaluateNegation :: [VEvaluation] -> VEvaluation
 _evaluateNegation [Right (VBool True)] = Right $ VBool False
 _evaluateNegation [Right (VBool False)] = Right $ VBool True
 _evaluateNegation (Left ee : _) = Left ee
 _evaluateNegation [_] = Left VTypeError
 _evaluateNegation _ = Left VArityError
 
-_evaluateDiv :: [Evaluation] -> Evaluation
+_evaluateDiv :: [VEvaluation] -> VEvaluation
 _evaluateDiv [Right (VInteger i)] = Right $ VDouble (1 / fromIntegral i)
 _evaluateDiv [Right (VDouble i)] = Right $ VDouble (1 / i)
 _evaluateDiv [Right (VInteger i), Right (VInteger j)] = Right $ VDouble (fromIntegral i / fromIntegral j)
@@ -188,7 +196,7 @@ _evaluateDiv (_ : (Left ee) : _) = Left ee
 _evaluateDiv (_ : (Right x) : _) | _isNotNumeric x = Left VTypeError
 _evaluateDiv _ = Left VArityError
 
-_evaluateAnd :: [Evaluation] -> Evaluation
+_evaluateAnd :: [VEvaluation] -> VEvaluation
 _evaluateAnd = foldr f (Right (VBool True))
   where
     f (Right v) _ | _isNotBoolean v = Left VTypeError
@@ -198,7 +206,7 @@ _evaluateAnd = foldr f (Right (VBool True))
     f (Right (VBool True)) (Right (VBool v)) = Right (VBool v)
     f _ _ = Left VTypeError
 
-_evaluateOr :: [Evaluation] -> Evaluation
+_evaluateOr :: [VEvaluation] -> VEvaluation
 _evaluateOr = foldr f (Right (VBool False))
   where
     f (Right v) _ | _isNotBoolean v = Left VTypeError
@@ -208,27 +216,25 @@ _evaluateOr = foldr f (Right (VBool False))
     f (Right (VBool False)) (Right (VBool v)) = Right (VBool v)
     f _ _ = Left VTypeError
 
-_evaluateIfElse :: [Evaluation] -> Evaluation
+_evaluateIfElse :: [VEvaluation] -> VEvaluation
 _evaluateIfElse [Right (VBool True), x, _] = x
 _evaluateIfElse [Right (VBool False), _, x] = x
 _evaluateIfElse ((Right c) : _) | _isNotBoolean c = Left VTypeError
 _evaluateIfElse ((Left ee) : _) = Left ee
 _evaluateIfElse _ = Left VArityError
 
-_evaluateDefine :: String -> SExp -> State SymbolsTable Evaluation
+_evaluateDefine :: String -> SExp -> State SymbolsTable VEvaluation
 _evaluateDefine sid sexp = do
     evaluation <- _defaultEvaluate sexp
     case evaluation of
         Right value -> do
             symbolsTable <- get
-            let st0 = fromMaybe mempty $ RIO.List.headMaybe symbolsTable
-            let sts = fromMaybe [] $ RIO.List.tailMaybe symbolsTable
-            let updatedSymbolsTable = insert sid value st0
-            put (updatedSymbolsTable : sts)
+            let updatedSymbolsTable = insert sid value symbolsTable
+            put updatedSymbolsTable
             return $ Right value
         Left ee -> return $ Left ee
 
-_defineFunction :: SymbolsTable -> SExp -> SExp -> Evaluation
+_defineFunction :: SymbolsTable -> SExp -> SExp -> VEvaluation
 _defineFunction symbolsTable (SSExp maybeIdentifiers) sexp = do
     identifiers <- mapM _parseId maybeIdentifiers
     let enclosingSymbols = _getEnclosingSymbols symbolsTable sexp
@@ -243,18 +249,12 @@ _parseId :: SExp -> Either EvaluationError String
 _parseId (SId (Identifier{id = identifier})) = Right identifier
 _parseId _ = Left VTypeError
 
-_lookupSt :: String -> SymbolsTable -> Maybe Value
-_lookupSt _ [] = Nothing
-_lookupSt k (h : rest) = case RIO.Map.lookup k h of
-    Nothing -> _lookupSt k rest
-    Just x -> Just x
-
 _getEnclosingSymbols :: SymbolsTable -> SExp -> Map String Value
 _getEnclosingSymbols symbolsTable (SSExp sexps) = foldr f mempty sexps
   where
     f sexp symbols = symbols `union` _getEnclosingSymbols symbolsTable sexp
 _getEnclosingSymbols symbolsTable (SId (Identifier{id = id_})) =
-    case _lookupSt id_ symbolsTable of
+    case RIO.Map.lookup id_ symbolsTable of
         Just v -> insert id_ v mempty
         Nothing -> mempty
 _getEnclosingSymbols _ _ = mempty

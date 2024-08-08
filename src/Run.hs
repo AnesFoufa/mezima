@@ -24,7 +24,7 @@ repl state = do
             let (evaluation, state') = runState (runEvaluator evaluator sexp) state
             case evaluation of
                 Left ee -> outputStrLn $ show ee
-                Right v -> outputStrLn $ show $ represent v
+                Right s -> outputStrLn $ show s
             repl state'
 
 run :: RIO App ()
@@ -33,5 +33,4 @@ run = do
     let options = appOptions env
     let suffix = if optionsVerbose options then " Verbose !!!" else ""
     logInfo $ "You are entering Mezima's REPL. " <> suffix
-    let initState = [mempty]
-    liftIO $ runInputT defaultSettings $ repl initState
+    liftIO $ runInputT defaultSettings $ repl initSymbolsTable
