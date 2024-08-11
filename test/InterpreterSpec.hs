@@ -33,7 +33,7 @@ spec = do
         it "Evaluates empty sum as 0" do
             evaluates (SSExp [sumIdentifier]) `shouldBe` Right (SInteger 0)
         prop "should evaluate sum of integers as sum of integers" do
-            \is -> evaluates (SSExp (sumIdentifier : fmap SInteger is)) `shouldBe` Right (if sum is >= 0 then SInteger (sum is) else (SSExp [minusIdentifier, SInteger (-sum is)]))
+            \is -> evaluates (SSExp (sumIdentifier : fmap SInteger is)) `shouldBe` Right (if sum is >= 0 then SInteger (sum is) else SSExp [minusIdentifier, SInteger (-sum is)])
         prop "Evaluates sum of doubles" do
             \ds -> isRight (evaluates (SSExp (sumIdentifier : fmap SDouble ds))) `shouldBe` True
         it "Returns type errors when summing non numerics" do
@@ -54,10 +54,8 @@ spec = do
             evaluates (SSExp [equalityIdentifier, SInteger 1, SInteger 2]) `shouldBe` Right (SBool False)
         it "Evaluates equality of different doubles as False" do
             evaluates (SSExp [equalityIdentifier, SDouble 1.2, SDouble 2.4]) `shouldBe` Right (SBool False)
-        it "Evaluates equality of non numeric as VTypeError" do
-            evaluates (SSExp [equalityIdentifier, SString "foo"]) `shouldBe` Left VTypeError
         it "Lazily evaluates an equality returning VTypeError" do
-            evaluates (SSExp (equalityIdentifier : SString "foo" : repeat (SInteger 42))) `shouldBe` Left VTypeError
+            evaluates (SSExp (equalityIdentifier : SId (Identifier{id = "+"}) : repeat (SInteger 42))) `shouldBe` Left VTypeError
         it "Lazily evaluates an equality returning False" do
             evaluates (SSExp (equalityIdentifier : SInteger 1 : SInteger 2 : repeat (SString "foo"))) `shouldBe` Right (SBool False)
         it "Evaluates negative integers" do

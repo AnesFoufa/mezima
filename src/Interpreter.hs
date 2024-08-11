@@ -145,18 +145,23 @@ evaluateProd = foldr f (Right (VInteger 1))
 
 evaluateEq :: [VEvaluation] -> VEvaluation
 evaluateEq [] = Right $ VBool True
-evaluateEq ((Right x) : _) | isNotNumeric x = Left VTypeError
+evaluateEq ((Right x) : _) | isNotComparable x = Left VTypeError
 evaluateEq ((Right x) : rest) = foldr f (Right (VBool True)) rest
   where
     f (Left ee) _ = Left ee
-    f (Right y) _ | isNotNumeric y = Left VTypeError
-    f (Right y) _ | numericDifferent x y = Right (VBool False)
+    f (Right v) _ | isNotComparable v = Left VTypeError
+    f (Right y) _ | different x y = Right (VBool False)
     f _ _ = Right (VBool True)
-    numericDifferent (VInteger i) (VInteger j) = i /= j
-    numericDifferent (VInteger i) (VDouble j) = fromIntegral i /= j
-    numericDifferent (VDouble i) (VInteger j) = i /= fromIntegral j
-    numericDifferent (VDouble i) (VDouble j) = i /= j
-    numericDifferent _ _ = False
+    different (VInteger i) (VInteger j) = i /= j
+    different (VInteger i) (VDouble j) = fromIntegral i /= j
+    different (VDouble i) (VInteger j) = i /= fromIntegral j
+    different (VDouble i) (VDouble j) = i /= j
+    different (VBool i) (VBool j) = i /= j
+    different (VString i) (VString j) = i /= j
+    different (VList i) (VList j) | length i /= length j = True
+    different (VList i) (VList j) = any diff (zip i j)
+    different _ _ = True
+    diff (i, j) = different i j
 evaluateEq ((Left ee) : _) = Left ee
 
 evaluateNegative :: [VEvaluation] -> VEvaluation
@@ -271,6 +276,13 @@ isNotNumeric :: Value -> Bool
 isNotNumeric (VInteger _) = False
 isNotNumeric (VDouble _) = False
 isNotNumeric _ = True
+
 isNotBoolean :: Value -> Bool
 isNotBoolean (VBool _) = False
 isNotBoolean _ = True
+
+isNotComparable :: Value -> Bool
+isNotComparable (VFunction{}) = True
+isNotComparable (VBuiltIn{}) = True
+isNotComparable (VList l) = any isNotComparable l
+isNotComparable _ = False
